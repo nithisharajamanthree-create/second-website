@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculator App</title>
+    <style>
+      :root {
+        --bg-1: #0b1020;
+        --bg-2: #171f36;
+        --panel: rgba(18, 25, 41, 0.9);
+        --panel-alt: rgba(28, 38, 57, 0.95);
+        --text: #eaf2ff;
+        --muted: #8ea0bf;
+        --primary: #6ea8fe;
+        --primary-2: #8b5cf6;
+        --danger: #ff6b6b;
+        --success: #6ee7b7;
+        --shadow: rgba(6, 11, 22, 0.5);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+        color: var(--text);
+      }
+
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .calculator {
+        width: min(100%, 420px);
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 28px;
+        box-shadow: 0 28px 70px var(--shadow);
+        overflow: hidden;
+      }
+
+      .screen {
+        background: rgba(8, 12, 23, 0.8);
+        padding: 28px 22px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .formula {
+        min-height: 28px;
+        font-size: 1rem;
+        color: var(--muted);
+        text-align: right;
+        word-break: break-all;
+      }
+
+      .output {
+        min-height: 72px;
+        display: flex;
+        align-items: end;
+        justify-content: flex-end;
+        font-size: clamp(2.2rem, 6vw, 3.2rem);
+        line-height: 1;
+        font-weight: 700;
+        text-align: right;
+        word-break: break-all;
+      }
+
+      .keypad {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        padding: 18px;
+        background: var(--panel-alt);
+      }
+
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 18px;
+        min-height: 64px;
+        font-size: 1.15rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        opacity: 0.98;
+      }
+
+      button:active {
+        transform: translateY(1px) scale(0.99);
+      }
+
+      .operator {
+        background: linear-gradient(135deg, rgba(110, 168, 254, 0.18), rgba(139, 92, 246, 0.18));
+      }
+
+      .function {
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .equal {
+        background: linear-gradient(135deg, var(--primary), var(--primary-2));
+        color: white;
+      }
+
+      .clear {
+        background: rgba(255, 107, 107, 0.12);
+        color: #ffd0d0;
+      }
+
+      .zero {
+        grid-column: span 2;
+      }
+
+      @media (max-width: 420px) {
+        .calculator {
+          border-radius: 22px;
+        }
+
+        .keypad {
+          gap: 10px;
+          padding: 14px;
+        }
+
+        button {
+          min-height: 58px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="calculator" aria-label="Calculator application">
+      <div class="screen">
+        <div class="formula" id="formula">0</div>
+        <div class="output" id="output">0</div>
+      </div>
+
+      <div class="keypad">
+        <button class="clear" data-action="clear">AC</button>
+        <button class="function" data-action="delete">DEL</button>
+        <button class="function" data-action="toggle-sign">±</button>
+        <button class="operator" data-value="/">÷</button>
+
+        <button class="function" data-action="sqrt">√</button>
+        <button class="function" data-action="square">x²</button>
+        <button class="function" data-action="reciprocal">1/x</button>
+        <button class="operator" data-value="*">×</button>
+
+        <button data-value="7">7</button>
+        <button data-value="8">8</button>
+        <button data-value="9">9</button>
+        <button class="operator" data-value="-">−</button>
+
+        <button data-value="4">4</button>
+        <button data-value="5">5</button>
+        <button data-value="6">6</button>
+        <button class="operator" data-value="+">+</button>
+
+        <button data-value="1">1</button>
+        <button data-value="2">2</button>
+        <button data-value="3">3</button>
+        <button class="equal" data-action="equals">=</button>
+
+        <button class="zero" data-value="0">0</button>
+        <button data-value=".">.</button>
+        <button class="function" data-action="percent">%</button>
+      </div>
+    </div>
+
+    <script>
+      const output = document.getElementById('output');
+      const formula = document.getElementById('formula');
+      const buttons = document.querySelectorAll('.keypad button');
+
+      let currentValue = '0';
+      let expression = '';
+      let lastActionWasEquals = false;
+
+      function formatNumber(value) {
+        if (!Number.isFinite(value)) return 'Error';
+        const abs = Math.abs(value);
+        if (abs >= 1e12 || (abs > 0 && abs < 1e-8)) {
+          return value.toExponential(6).replace(/\.?0+e/, 'e');
+        }
+
+        const stringValue = String(Number(value.toFixed(12)));
+        return stringValue;
+      }
+
+      function updateDisplay() {
+        output.textContent = currentValue;
+        formula.textContent = expression || '0';
+      }
+
+      function appendValue(value) {
+        if (currentValue === 'Error') {
+          expression = '';
+          currentValue = '0';
+        }
+
+        if (lastActionWasEquals) {
+          expression = '';
+          currentValue = '0';
+          lastActionWasEquals = false;
+        }
+
+        if (value === '.') {
+          if (currentValue.includes('.')) return;
+          if (currentValue === '0' || currentValue === '') {
+            currentValue = '0.';
+          } else {
+            currentValue += '.';
+          }
+          updateDisplay();
+          return;
+        }
+
+        if (currentValue === '0' && value !== '.') {
+          currentValue = value;
+        } else {
+          currentValue += value;
+        }
+
+        updateDisplay();
+      }
+
+      function computeExpression(rawExpression) {
+        const sanitized = rawExpression
+          .replace(/×/g, '*')
+          .replace(/÷/g, '/')
+          .replace(/−/g, '-')
+          .replace(/\s+/g, '');
+
+        if (!sanitized || sanitized === '.') {
+          return Number.NaN;
+        }
+
+        if (!/^[0-9+\-*/().]+$/.test(sanitized)) {
+          return Number.NaN;
+        }
+
+        try {
+          const result = Function(`"use strict"; return (${sanitized});`)();
+          return Number.isFinite(result) ? result : Number.NaN;
+        } catch {
+          return Number.NaN;
+        }
+      }
+
+      function appendOperator(operator) {
+        if (currentValue === 'Error') return;
+
+        if (lastActionWasEquals) {
+          expression = currentValue + operator;
+          currentValue = '0';
+          lastActionWasEquals = false;
+          updateDisplay();
+          return;
+        }
+
+        if (!expression) {
+          expression = currentValue + operator;
+          currentValue = '0';
+          updateDisplay();
+          return;
+        }
+
+        if (/[+\-*/]$/.test(expression)) {
+          expression = expression.slice(0, -1) + operator;
+          currentValue = '0';
+          updateDisplay();
+          return;
+        }
+
+        const raw = expression + currentValue;
+        const result = computeExpression(raw);
+
+        if (!Number.isFinite(result)) {
+          expression = '';
+          currentValue = 'Error';
+          updateDisplay();
+          return;
+        }
+
+        expression = formatNumber(result) + operator;
+        currentValue = '0';
+        updateDisplay();
+      }
+
+      function equals() {
+        if (!expression && currentValue === 'Error') return;
+
+        let raw = expression ? expression + currentValue : currentValue;
+
+        if (/[+\-*/]$/.test(raw)) {
+          raw = raw.slice(0, -1);
+        }
+
+        const result = computeExpression(raw);
+
+        if (!Number.isFinite(result)) {
+          expression = '';
+          currentValue = 'Error';
+          updateDisplay();
+          return;
+        }
+
+        expression = raw;
+        currentValue = formatNumber(result);
+        lastActionWasEquals = true;
+        updateDisplay();
+      }
+
+      function clearAll() {
+        expression = '';
+        currentValue = '0';
+        lastActionWasEquals = false;
+        updateDisplay();
+      }
+
+      function deleteLast() {
+        if (lastActionWasEquals) {
+          clearAll();
+          return;
+        }
+
+        if (currentValue === 'Error') {
+          clearAll();
+          return;
+        }
+
+        if (currentValue.length <= 1) {
+          currentValue = '0';
+        } else {
+          currentValue = currentValue.slice(0, -1);
+        }
+
+        updateDisplay();
+      }
+
+      function toggleSign() {
+        if (currentValue === 'Error' || currentValue === '0') return;
+
+        currentValue = currentValue.startsWith('-') ? currentValue.slice(1) : `-${currentValue}`;
+        updateDisplay();
+      }
+
+      function applyPercent() {
+        const value = Number(currentValue || 0);
+        if (!Number.isFinite(value)) {
+          currentValue = 'Error';
+          updateDisplay();
+          return;
+        }
+
+        currentValue = formatNumber(value / 100);
+        updateDisplay();
+      }
+
+      function applySqrt() {
+        const value = Number(currentValue);
+        if (value < 0) {
+          currentValue = 'Error';
+          updateDisplay();
+          return;
+        }
+        currentValue = formatNumber(Math.sqrt(value));
+        updateDisplay();
+      }
+
+      function applySquare() {
+        const value = Number(currentValue);
+        currentValue = formatNumber(value * value);
+        updateDisplay();
+      }
+
+      function applyReciprocal() {
+        const value = Number(currentValue);
+        if (value === 0) {
+          currentValue = 'Error';
+          updateDisplay();
+          return;
+        }
+        currentValue = formatNumber(1 / value);
+        updateDisplay();
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const value = button.dataset.value;
+          const action = button.dataset.action;
+
+          if (action) {
+            switch (action) {
+              case 'clear':
+                clearAll();
+                break;
+              case 'delete':
+                deleteLast();
+                break;
+              case 'toggle-sign':
+                toggleSign();
+                break;
+              case 'percent':
+                applyPercent();
+                break;
+              case 'sqrt':
+                applySqrt();
+                break;
+              case 'square':
+                applySquare();
+                break;
+              case 'reciprocal':
+                applyReciprocal();
+                break;
+              case 'equals':
+                equals();
+                break;
+              default:
+                break;
+            }
+            return;
+          }
+
+          if (['+', '-', '*', '/'].includes(value)) {
+            appendOperator(value);
+            return;
+          }
+
+          appendValue(value);
+        });
+      });
+
+      document.addEventListener('keydown', (event) => {
+        const { key } = event;
+
+        if (/^[0-9]$/.test(key)) {
+          appendValue(key);
+        } else if (['+', '-', '*', '/'].includes(key)) {
+          appendOperator(key);
+        } else if (key === '.') {
+          appendValue('.');
+        } else if (key === 'Enter' || key === '=') {
+          equals();
+        } else if (key === 'Backspace') {
+          deleteLast();
+        } else if (key === 'Escape') {
+          clearAll();
+        } else if (key === '%') {
+          applyPercent();
+        }
+      });
+
+      updateDisplay();
+    </script>
+  </body>
+</html>
